@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>生字配對遊戲 - 海綿寶寶秋天版</title>
+    <style>
+        /* --- 1. 柔和色系與基礎設定 --- */
+        :root {
+            --bg-color: #FFF9E6;
+            --container-bg: #FFFFFF;
+            --primary-color: #AED9E0; 
+            --success-color: #B7E4C7; 
+            --error-color: #FFB7B2;    
+            --hint-color: #FF8C42;      
+            --text-color: #555;
+            --zhuyin-color: #88B0B8;
+            --btn-color: #FFD166;       
+            --review-btn-color: #90DBF4; 
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+            user-select: none;
+            touch-action: none;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            padding-bottom: 60px; /* 預留底部空間 */
+        }
+
+        .header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+            font-size: 1.1em;
+            font-weight: bold;
+            color: var(--zhuyin-color);
+        }
+
+        .question-area {
+            width: 90%;
+            aspect-ratio: 16/9;
+            background-color: #fff;
+            border: 5px solid var(--primary-color);
+            border-radius: 20px;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .question-area img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* 保持圖片比例充滿 */
+        }
+
+        .question-speak-btn {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(255,255,255,0.8);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            font-size: 20px;
+        }
+
+        .drop-zone {
+            width: 160px;
+            height: 160px;
+            border: 3px dashed #ccc;
+            border-radius: 20px;
+            background-color: rgba(255,255,255,0.5);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2em;
+            color: #aaa;
+            transition: all 0.3s;
+            position: relative;
+            text-align: center;
+            padding: 5px;
+        }
+
+        .drop-zone.hover {
+            border-color: var(--primary-color);
+            background-color: #E0F7FA;
+            transform: scale(1.05);
+        }
+
+        .drop-zone.correct {
+            border-color: var(--success-color);
+            background-color: var(--success-color);
+            color: white;
+            border-style: solid;
+        }
+
+        .drop-zone.wrong {
+            border-color: var(--error-color);
+            background-color: var(--error-color);
+            animation: shake 0.5s;
+        }
+        
+        .drop-zone .correct-text {
+            font-size: 2.5em;
+            font-weight: bold;
+            line-height: 1.2;
+        }
+
+        .word-pool {
+            width: 100%;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            padding: 10px;
+            background-color: rgba(255,255,255,0.6);
+            border-radius: 20px;
+            min-height: 150px;
+        }
+
+        /* --- 卡片設計 --- */
+        .draggable-card {
+            width: 80px;
+            height: 80px;
+            background-color: white;
+            border-radius: 15px;
+            border: 3px solid transparent; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: grab;
+            touch-action: none;
+            position: relative; 
+            z-index: 10;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .draggable-card:active {
+            cursor: grabbing;
+            box-shadow: 0 8px 12px rgba(0,0,0,0.2);
+            z-index: 100;
+        }
+
+        /* 字體大小控制 */
+        .char-text {
+            font-size: 2.2em;
+            font-weight: bold;
+            line-height: 1;
+            color: var(--text-color);
+            margin-top: 5px;
+        }
+        
+        .zhuyin-text {
+            font-size: 1em;
+            color: var(--zhuyin-color);
+            font-weight: bold;
+        }
+
+        /* 2-3個字的詞 */
+        .draggable-card.medium-text .char-text { font-size: 1.4em; margin-top: 2px; }
+        .draggable-card.medium-text .zhuyin-text { font-size: 0.7em; }
+
+        /* 4個字的詞 */
+        .draggable-card.small-text .char-text { font-size: 1.0em; margin-top: 2px; }
+        .draggable-card.small-text .zhuyin-text { font-size: 0.5em; transform: scale(0.9); }
+
+        /* --- 提示動畫 --- */
+        @keyframes pulse-hint {
+            0% { border-color: var(--hint-color); box-shadow: 0 0 10px var(--hint-color); transform: scale(1); }
+            50% { border-color: #FF4500; box-shadow: 0 0 25px var(--hint-color); transform: scale(1.15); }
+            100% { border-color: var(--hint-color); box-shadow: 0 0 10px var(--hint-color); transform: scale(1); }
+        }
+
+        .card-hint-active {
+            animation: pulse-hint 1s infinite;
+            z-index: 50 !important;
+        }
+
+        .voice-btn {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 25px;
+            height: 25px;
+            background-color: var(--btn-color);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            z-index: 20;
+        }
+        
+        .voice-btn:active {
+            transform: scale(0.9);
+            background-color: #ffc107;
+        }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            50% { transform: translateX(10px); }
+            75% { transform: translateX(-10px); }
+            100% { transform: translateX(0); }
+        }
+
+        /* --- 結算畫面 --- */
+        #victory-screen {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(255, 249, 230, 0.98);
+            z-index: 999;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        
+        #victory-title { 
+            color: #FF8C42; 
+            font-size: 2.5em; 
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .action-btn {
+            padding: 15px 40px;
+            font-size: 1.5em;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.2);
+            font-family: inherit;
+            font-weight: bold;
+        }
+
+        .btn-restart { background-color: var(--success-color); }
+        .btn-review { background-color: var(--review-btn-color); color: #333; }
+
+        #start-audio-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: #ffd166;
+            border: none;
+            border-radius: 20px;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 50;
+        }
+
+    </style>
+</head>
+<body>
+
+    <button id="start-audio-btn" onclick="initAudio()">🔊 開啟音效</button>
+
+    <div class="game-container">
+        <div class="header">
+            <span>生字配對-海綿寶寶篇</span>
+            <span id="score">0 / 0</span>
+        </div>
+
+        <div class="question-area">
+            <img id="q-img" src="" alt="題目圖片">
+            <div class="question-speak-btn" onclick="speakCurrentAnswer()">🔊</div>
+        </div>
+
+        <div class="drop-zone" id="target-zone">
+            請把字拖進來
+        </div>
+
+        <div class="word-pool" id="pool">
+            </div>
+    </div>
+
+    <div id="victory-screen">
+        <h1 id="victory-title"></h1>
+        <div class="btn-group" id="victory-btns"></div>
+    </div>
+
+    <script>
+        // 資料設定區：已更新為您指定的14個字與順序
+        const gameData = [
+            { id: 1, char: '秋', zhuyin: 'ㄑㄧㄡ', img: '1.png' },
+            { id: 2, char: '千', zhuyin: 'ㄑㄧㄢ', img: '2.png' },
+            { id: 3, char: '和', zhuyin: 'ㄏㄢˋ', img: '3.png' },
+            { id: 4, char: '玩', zhuyin: 'ㄨㄢˊ', img: '4.png' },
+            { id: 5, char: '陪', zhuyin: 'ㄆㄟˊ', img: '5.png' },
+            { id: 6, char: '高', zhuyin: 'ㄍㄠ', img: '6.png' },
+            { id: 7, char: '山', zhuyin: 'ㄕㄢ', img: '7.png' },
+            { id: 8, char: '到', zhuyin: 'ㄉㄠˋ', img: '8.png' },
+            { id: 9, char: '大', zhuyin: 'ㄉㄚˋ', img: '9.png' },
+            { id: 10, char: '海', zhuyin: 'ㄏㄞˇ', img: '10.png' },
+            { id: 11, char: '朋', zhuyin: 'ㄆㄥˊ', img: '11.png' },
+            { id: 12, char: '友', zhuyin: 'ㄧㄡˇ', img: '12.png' },
+            { id: 13, char: '們', zhuyin: 'ㄇㄣ˙', img: '13.png' },
+            { id: 14, char: '起', zhuyin: 'ㄑㄧˇ', img: '14.png' }
+        ];
+
+        let questionOrder = [];
+        let currentQIndex = 0;
+        let wrongAnswers = []; 
+        let audioContext = null;
+
+        const qImg = document.getElementById('q-img');
+        const targetZone = document.getElementById('target-zone');
+        const pool = document.getElementById('pool');
+        const scoreDisplay = document.getElementById('score');
+        const victoryScreen = document.getElementById('victory-screen');
+        const victoryTitle = document.getElementById('victory-title');
+        const victoryBtns = document.getElementById('victory-btns');
+        const startAudioBtn = document.getElementById('start-audio-btn');
+
+        // --- 初始化遊戲 ---
+        function initGame() {
+            wrongAnswers = []; 
+            // 正常模式：所有題目隨機排序
+            questionOrder = [...gameData].sort(() => 0.5 - Math.random());
+            currentQIndex = 0;
+            
+            // 產生所有字卡
+            createWordCards(gameData);
+            loadLevel();
+        }
+
+        // --- 載入關卡 ---
+        function loadLevel() {
+            if (currentQIndex >= questionOrder.length) {
+                showSummary();
+                return;
+            }
+
+            const currentData = questionOrder[currentQIndex];
+            
+            qImg.style.opacity = 0;
+            qImg.src = currentData.img;
+            qImg.onload = () => { qImg.style.opacity = 1; };
+            qImg.onerror = () => { 
+                // 如果找不到圖片，顯示提示文字
+                qImg.alt = `(圖片缺失: ${currentData.img})`;
+                qImg.style.opacity = 1;
+            };
+            
+            targetZone.className = 'drop-zone';
+            targetZone.innerHTML = '請把字拖進來';
+            scoreDisplay.innerText = `${currentQIndex + 1} / ${questionOrder.length}`;
+            
+            clearAllHints();
+        }
+
+        // --- 產生字卡 (接收資料來源) ---
+        function createWordCards(dataSource) {
+            pool.innerHTML = '';
+            const shuffledWords = [...dataSource].sort(() => 0.5 - Math.random());
+
+            shuffledWords.forEach(data => {
+                const card = document.createElement('div');
+                card.className = 'draggable-card';
+                
+                // 根據字數調整樣式
+                if (data.char.length >= 4) {
+                    card.classList.add('small-text');
+                } else if (data.char.length >= 2) {
+                    card.classList.add('medium-text');
+                }
+
+                card.setAttribute('data-id', data.id);
+                
+                const voiceBtn = document.createElement('div');
+                voiceBtn.className = 'voice-btn';
+                voiceBtn.innerHTML = '🔊';
+                
+                const playSoundHandler = (e) => {
+                    e.stopPropagation(); 
+                    e.preventDefault(); 
+                    speak(data.char);
+                };
+
+                voiceBtn.addEventListener('mousedown', playSoundHandler);
+                voiceBtn.addEventListener('touchstart', playSoundHandler, {passive: false});
+
+                const content = `
+                    <div class="chinese-char char-text">${data.char}</div>
+                    <div class="zhuyin zhuyin-text">${data.zhuyin}</div>
+                `;
+
+                card.appendChild(voiceBtn);
+                card.insertAdjacentHTML('beforeend', content);
+
+                addDragListeners(card);
+                pool.appendChild(card);
+            });
+        }
+
+        // --- 結算與複習邏輯 ---
+        function showSummary() {
+            victoryScreen.style.display = 'flex';
+            victoryBtns.innerHTML = ''; 
+
+            if (wrongAnswers.length === 0) {
+                playVictorySound();
+                victoryTitle.innerHTML = "太棒了！<br>全部答對！";
+                
+                const btn = document.createElement('button');
+                btn.className = 'action-btn btn-restart';
+                btn.innerText = "再玩一次";
+                btn.onclick = () => {
+                    victoryScreen.style.display = 'none';
+                    initGame();
+                };
+                victoryBtns.appendChild(btn);
+
+            } else {
+                victoryTitle.innerHTML = `遊戲結束<br>總共答錯 ${wrongAnswers.length} 題`;
+                
+                const reviewBtn = document.createElement('button');
+                reviewBtn.className = 'action-btn btn-review';
+                reviewBtn.innerText = `複習答錯的 ${wrongAnswers.length} 題`;
+                reviewBtn.onclick = startReviewMode;
+                victoryBtns.appendChild(reviewBtn);
+
+                const restartBtn = document.createElement('button');
+                restartBtn.className = 'action-btn btn-restart';
+                restartBtn.innerText = "全部重新開始";
+                restartBtn.onclick = () => location.reload();
+                victoryBtns.appendChild(restartBtn);
+            }
+        }
+
+        function startReviewMode() {
+            // 1. 找出答錯的資料物件
+            const reviewData = gameData.filter(item => wrongAnswers.includes(item.id));
+            
+            // 2. 設定題目順序為這些錯題
+            questionOrder = [...reviewData].sort(() => 0.5 - Math.random());
+            currentQIndex = 0;
+            
+            // 3. 重新產生字卡池，只包含這些錯題
+            createWordCards(reviewData);
+
+            // 4. 清空錯題記錄
+            wrongAnswers = []; 
+            
+            victoryScreen.style.display = 'none';
+            loadLevel();
+        }
+
+        // --- 語音 & 音效 ---
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'zh-TW';
+                utterance.rate = 0.8;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function speakCurrentAnswer() {
+             const currentData = questionOrder[currentQIndex];
+             speak(currentData.char);
+        }
+
+        function playTone(type) {
+            if (!audioContext) return;
+            if (audioContext.state === 'suspended') audioContext.resume();
+
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            if (type === 'correct') {
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(659.25, audioContext.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.5);
+            } else if (type === 'wrong') {
+                oscillator.type = 'sawtooth'; 
+                oscillator.frequency.setValueAtTime(300, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.4);
+                gainNode.gain.setValueAtTime(1.0, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.4);
+            }
+        }
+
+        function playVictorySound() {
+            if (!audioContext) return;
+            if (audioContext.state === 'suspended') audioContext.resume();
+            
+            const notes = [523.25, 659.25, 783.99, 1046.50];
+            let time = audioContext.currentTime;
+            notes.forEach((note, i) => {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                osc.frequency.value = note;
+                gain.gain.setValueAtTime(0.2, time + i*0.15);
+                gain.gain.exponentialRampToValueAtTime(0.01, time + i*0.15 + 0.3);
+                osc.start(time + i*0.15);
+                osc.stop(time + i*0.15 + 0.4);
+            });
+        }
+
+        function initAudio() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            startAudioBtn.style.display = 'none';
+            if (audioContext.state === 'suspended') audioContext.resume();
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+            osc.start();
+            osc.stop(audioContext.currentTime + 0.01);
+        }
+
+        // --- 拖曳與提示邏輯 ---
+        function showHintForCorrectAnswer() {
+            const currentAnswerId = questionOrder[currentQIndex].id;
+            const allCards = document.querySelectorAll('.draggable-card');
+            
+            allCards.forEach(card => {
+                if (parseInt(card.getAttribute('data-id')) === currentAnswerId) {
+                    card.classList.add('card-hint-active');
+                    setTimeout(() => {
+                        card.classList.remove('card-hint-active');
+                    }, 3000);
+                }
+            });
+        }
+
+        function clearAllHints() {
+            const allCards = document.querySelectorAll('.draggable-card');
+            allCards.forEach(card => card.classList.remove('card-hint-active'));
+        }
+
+        let draggedItem = null;
+        let initialX, initialY;
+
+        function addDragListeners(el) {
+            el.addEventListener('mousedown', dragStart);
+            el.addEventListener('touchstart', dragStart, {passive: false});
+        }
+
+        function dragStart(e) {
+            if (e.target.classList.contains('voice-btn')) return;
+            this.classList.remove('card-hint-active');
+            e.preventDefault();
+            draggedItem = this;
+
+            const rect = draggedItem.getBoundingClientRect();
+            initialX = rect.left;
+            initialY = rect.top;
+
+            draggedItem.style.position = 'fixed';
+            draggedItem.style.left = initialX + 'px';
+            draggedItem.style.top = initialY + 'px';
+            draggedItem.style.zIndex = 1000;
+            draggedItem.style.width = rect.width + 'px';
+
+            document.addEventListener('mousemove', dragMove);
+            document.addEventListener('mouseup', dragEnd);
+            document.addEventListener('touchmove', dragMove, {passive: false});
+            document.addEventListener('touchend', dragEnd);
+        }
+
+        function dragMove(e) {
+            if (!draggedItem) return;
+            e.preventDefault();
+            let clientX, clientY;
+            if (e.type === 'touchmove') {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            draggedItem.style.left = (clientX - draggedItem.offsetWidth / 2) + 'px';
+            draggedItem.style.top = (clientY - draggedItem.offsetHeight / 2) + 'px';
+
+            const dropRect = targetZone.getBoundingClientRect();
+            if (clientX > dropRect.left && clientX < dropRect.right &&
+                clientY > dropRect.top && clientY < dropRect.bottom) {
+                targetZone.classList.add('hover');
+            } else {
+                targetZone.classList.remove('hover');
+            }
+        }
+
+        function dragEnd(e) {
+            if (!draggedItem) return;
+
+            document.removeEventListener('mousemove', dragMove);
+            document.removeEventListener('mouseup', dragEnd);
+            document.removeEventListener('touchmove', dragMove);
+            document.removeEventListener('touchend', dragEnd);
+
+            const dropRect = targetZone.getBoundingClientRect();
+            const cardRect = draggedItem.getBoundingClientRect();
+            const centerX = cardRect.left + cardRect.width / 2;
+            const centerY = cardRect.top + cardRect.height / 2;
+
+            if (centerX > dropRect.left && centerX < dropRect.right &&
+                centerY > dropRect.top && centerY < dropRect.bottom) {
+                checkAnswer(draggedItem);
+            } else {
+                returnToPool(draggedItem);
+            }
+
+            targetZone.classList.remove('hover');
+            draggedItem = null;
+        }
+
+        function checkAnswer(card) {
+            const cardId = parseInt(card.getAttribute('data-id'));
+            const currentAnswerData = questionOrder[currentQIndex];
+
+            if (cardId === currentAnswerData.id) {
+                playTone('correct');
+                targetZone.classList.add('correct');
+                // 顯示答案
+                targetZone.innerHTML = `<div class="correct-text">${currentAnswerData.char}</div>`;
+                speak(currentAnswerData.char);
+                card.style.display = 'none';
+
+                setTimeout(() => {
+                    currentQIndex++;
+                    loadLevel();
+                }, 1500);
+            } else {
+                playTone('wrong'); 
+                if (!wrongAnswers.includes(currentAnswerData.id)) {
+                    wrongAnswers.push(currentAnswerData.id);
+                }
+                targetZone.classList.add('wrong');
+                targetZone.innerText = "再試試看";
+                returnToPool(card);
+                showHintForCorrectAnswer();
+                setTimeout(() => {
+                    targetZone.classList.remove('wrong');
+                    targetZone.innerText = "請把字拖進來";
+                }, 1000);
+            }
+        }
+
+        function returnToPool(card) {
+            card.style.transition = 'all 0.3s ease';
+            card.style.left = initialX + 'px';
+            card.style.top = initialY + 'px';
+            setTimeout(() => {
+                card.style.position = 'relative';
+                card.style.left = 'auto';
+                card.style.top = 'auto';
+                card.style.zIndex = 10;
+                card.style.transition = '';
+            }, 300);
+        }
+
+        // 啟動
+        window.onload = initGame;
+    </script>
+</body>
+</html>
